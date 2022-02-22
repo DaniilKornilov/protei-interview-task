@@ -32,16 +32,6 @@ public class SystemUser {
     @Enumerated(EnumType.STRING)
     private SystemUserStatus userStatus;
 
-    public SystemUser(String name,
-                      String email,
-                      String phoneNumber,
-                      SystemUserStatus userStatus) {
-        this.name = name;
-        this.email = email;
-        this.phoneNumber = phoneNumber;
-        this.userStatus = userStatus;
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

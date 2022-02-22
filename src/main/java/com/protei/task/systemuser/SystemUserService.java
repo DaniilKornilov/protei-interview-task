@@ -1,8 +1,5 @@
 package com.protei.task.systemuser;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.i18n.phonenumbers.NumberParseException;
 import com.google.i18n.phonenumbers.PhoneNumberUtil;
 import com.google.i18n.phonenumbers.Phonenumber.PhoneNumber;
@@ -17,12 +14,12 @@ import org.springframework.stereotype.Service;
 
 import javax.transaction.Transactional;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class SystemUserService {
     private static final String PHONE_NUMBER_REGION = "RU";
 
+    private static final String NAME_IS_INVALID = "User name is invalid!";
     private static final String PHONE_NUMBER_IS_TAKEN = "Phone number is taken!";
     private static final String EMAIL_IS_TAKEN = "Email is taken!";
     private static final String EMAIL_IS_INVALID = "Email is invalid!";
@@ -46,94 +43,88 @@ public class SystemUserService {
         return systemUserRepository.findAll();
     }
 
-    public SystemUser getSystemUSerById(long userId) {
+    public SystemUser getSystemUserById(long userId) {
         return systemUserRepository.findSystemUserById(userId)
-                .orElseThrow(() ->
-                        new UserValidationException(String.format(NO_USER_WITH_ID, userId)));
+                .orElseThrow(() -> new UserValidationException(String.format(NO_USER_WITH_ID, userId)));
     }
 
-    public JsonNode addNewSystemUser(SystemUser user) {
-        if (isEmailInvalid(user.getEmail())) {
-            throw new UserValidationException(EMAIL_IS_INVALID);
-        }
-        if (isPhoneNumberInvalid(user.getPhoneNumber())) {
-            throw new UserValidationException(PHONE_NUMBER_IS_INVALID);
-        }
-        if (isEmailTaken(user.getEmail())) {
-            throw new UserValidationException(EMAIL_IS_TAKEN);
-        }
-        if (isPhoneNumberTaken(user.getPhoneNumber())) {
-            throw new UserValidationException(PHONE_NUMBER_IS_TAKEN);
-        }
+    public SystemUser addNewSystemUser(SystemUser user) {
+        validateName(user.getName());
+        validateEmail(user.getEmail());
+        validatePhoneNumber(user.getPhoneNumber());
         user.setUserStatus(SystemUserStatus.OFFLINE);
-        long userId = systemUserRepository.save(user).getId();
-        return formJsonForAddNewSystemUser(userId);
+        return systemUserRepository.save(user);
     }
 
     public void deleteSystemUser(long userId) {
-        if (!systemUserRepository.existsById(userId)) {
-            throw new UserValidationException(String.format(NO_USER_WITH_ID, userId));
-        }
-        systemUserRepository.deleteById(userId);
+        SystemUser user = systemUserRepository.findSystemUserById(userId)
+                .orElseThrow(() -> new UserValidationException(String.format(NO_USER_WITH_ID, userId)));
+        systemUserRepository.delete(user);
     }
 
     @Transactional
     public void updateSystemUser(long userId, String name, String email, String phoneNumber) {
-        Optional<SystemUser> userOptional = systemUserRepository.findSystemUserById(userId);
-        if (userOptional.isEmpty()) {
-            throw new UserValidationException(String.format(NO_USER_WITH_ID, userId));
-        }
-        SystemUser user = userOptional.get();
-        if (name != null && name.length() > 0) {
+        SystemUser user = systemUserRepository.findSystemUserById(userId)
+                .orElseThrow(() -> new UserValidationException(String.format(NO_USER_WITH_ID, userId)));
+        if (name != null) {
+            validateName(name);
             user.setName(name);
         }
-
         if (email != null) {
-            if (isEmailInvalid(email)) {
-                throw new UserValidationException(EMAIL_IS_INVALID);
-            }
-            if (isEmailTaken(email)) {
-                throw new UserValidationException(EMAIL_IS_TAKEN);
-            }
+            validateEmail(email);
             user.setEmail(email);
         }
-
         if (phoneNumber != null) {
-            if (isPhoneNumberInvalid(phoneNumber)) {
-                throw new UserValidationException(PHONE_NUMBER_IS_INVALID);
-            }
-            if (isPhoneNumberTaken(phoneNumber)) {
-                throw new UserValidationException(PHONE_NUMBER_IS_TAKEN);
-            }
+            validatePhoneNumber(phoneNumber);
             user.setPhoneNumber(phoneNumber);
         }
     }
 
     @Transactional
-    public JsonNode updateSystemUserStatus(long userId, String userStatus) {
-        Optional<SystemUser> userOptional = systemUserRepository.findSystemUserById(userId);
-        if (userOptional.isEmpty()) {
-            throw new UserValidationException(String.format(NO_USER_WITH_ID, userId));
+    public SystemUser updateSystemUserStatus(long userId, String userStatus) {
+        SystemUser user = systemUserRepository.findSystemUserById(userId)
+                .orElseThrow(() -> new UserValidationException(String.format(NO_USER_WITH_ID, userId)));
+        validateStatus(userStatus);
+        SystemUserStatus status = SystemUserStatus.valueOf(userStatus);
+        user.setUserStatus(status);
+        handleUserStatusJob(userId, status);
+        return user;
+    }
+
+    private void validateName(String name) {
+        if (name.length() == 0) {
+            throw new UserValidationException(NAME_IS_INVALID);
         }
-        SystemUser user = userOptional.get();
-        SystemUserStatus previousStatus = user.getUserStatus();
-        SystemUserStatus status;
+    }
+
+    private void validatePhoneNumber(String phoneNumber) {
+        if (isPhoneNumberInvalid(phoneNumber)) {
+            throw new UserValidationException(PHONE_NUMBER_IS_INVALID);
+        }
+        if (isPhoneNumberTaken(phoneNumber)) {
+            throw new UserValidationException(PHONE_NUMBER_IS_TAKEN);
+        }
+    }
+
+    private void validateEmail(String email) {
+        if (isEmailInvalid(email)) {
+            throw new UserValidationException(EMAIL_IS_INVALID);
+        }
+        if (isEmailTaken(email)) {
+            throw new UserValidationException(EMAIL_IS_TAKEN);
+        }
+    }
+
+    private void validateStatus(String status) {
         try {
-            status = SystemUserStatus.valueOf(userStatus);
+            SystemUserStatus.valueOf(status);
         } catch (IllegalArgumentException e) {
             throw new UserValidationException(USER_STATUS_IS_INVALID);
         }
-        user.setUserStatus(status);
-
-        handleUserStatusJob(userId, status);
-
-        return formJsonForSystemUserStatusUpdate(userId, previousStatus, user.getUserStatus());
     }
 
     private boolean isPhoneNumberTaken(String phoneNumber) {
-        Optional<SystemUser> systemUserOptional =
-                systemUserRepository.findSystemUserByPhoneNumber(phoneNumber);
-        return systemUserOptional.isPresent();
+        return systemUserRepository.findSystemUserByPhoneNumber(phoneNumber).isPresent();
     }
 
     private boolean isPhoneNumberInvalid(String phoneNumber) {
@@ -148,39 +139,11 @@ public class SystemUserService {
     }
 
     private boolean isEmailTaken(String email) {
-        Optional<SystemUser> systemUserOptional =
-                systemUserRepository.findSystemUserByEmail(email);
-        return systemUserOptional.isPresent();
+        return systemUserRepository.findSystemUserByEmail(email).isPresent();
     }
 
     private boolean isEmailInvalid(String email) {
         return !EmailValidator.getInstance().isValid(email);
-    }
-
-    private JsonNode formJsonForSystemUserStatusUpdate(long userId,
-                                                       SystemUserStatus previousStatus,
-                                                       SystemUserStatus currentStatus) {
-        String jsonString = "{\"userId\":\"" + userId + "\"," +
-                "\"previousUserStatus\":\"" + previousStatus + "\"," +
-                "\"currentUserStatus\":\"" + currentStatus + "\"}";
-        JsonNode jsonNode;
-        try {
-            jsonNode = new ObjectMapper().readTree(jsonString);
-        } catch (JsonProcessingException e) {
-            throw new UserValidationException(e.getMessage());
-        }
-        return jsonNode;
-    }
-
-    private JsonNode formJsonForAddNewSystemUser(long userId) {
-        String jsonString = "{\"userId\":\"" + userId + "\"}";
-        JsonNode jsonNode;
-        try {
-            jsonNode = new ObjectMapper().readTree(jsonString);
-        } catch (JsonProcessingException e) {
-            throw new UserValidationException(e.getMessage());
-        }
-        return jsonNode;
     }
 
     private void handleUserStatusJob(long userId, SystemUserStatus status) {

@@ -1,6 +1,5 @@
 package com.protei.task.systemuser;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,11 +22,11 @@ public class SystemUserController {
 
     @GetMapping(path = "{id}")
     public SystemUser getSystemUserById(@PathVariable("id") long userId) {
-        return systemUserService.getSystemUSerById(userId);
+        return systemUserService.getSystemUserById(userId);
     }
 
     @PostMapping
-    public JsonNode registerNewSystemUser(@RequestBody SystemUser user) {
+    public SystemUser registerNewSystemUser(@RequestBody SystemUser user) {
         return systemUserService.addNewSystemUser(user);
     }
 
@@ -41,15 +40,13 @@ public class SystemUserController {
             @PathVariable("id") long userId,
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String email,
-            @RequestParam(required = false) String phoneNumber) {
+            @RequestParam(required = false) String phoneNumber
+    ) {
         systemUserService.updateSystemUser(userId, name, email, phoneNumber);
     }
 
     @PutMapping(path = "status/{id}")
-    public JsonNode updateSystemUserStatus(
-            @PathVariable("id") long userId,
-            @RequestParam() String userStatus
-    ) {
+    public SystemUser updateSystemUserStatus(@PathVariable("id") long userId, @RequestParam() String userStatus) {
         return systemUserService.updateSystemUserStatus(userId, userStatus);
     }
 }
