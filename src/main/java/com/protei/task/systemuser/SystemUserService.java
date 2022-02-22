@@ -3,6 +3,7 @@ package com.protei.task.systemuser;
 import com.google.i18n.phonenumbers.NumberParseException;
 import com.google.i18n.phonenumbers.PhoneNumberUtil;
 import com.google.i18n.phonenumbers.Phonenumber.PhoneNumber;
+import com.protei.task.exception.UserNotFoundException;
 import com.protei.task.exception.UserValidationException;
 import com.protei.task.scheduler.JobInfo;
 import com.protei.task.scheduler.SchedulerService;
@@ -44,8 +45,7 @@ public class SystemUserService {
     }
 
     public SystemUser getSystemUserById(long userId) {
-        return systemUserRepository.findSystemUserById(userId)
-                .orElseThrow(() -> new UserValidationException(String.format(NO_USER_WITH_ID, userId)));
+        return findSystemUserById(userId);
     }
 
     public SystemUser addNewSystemUser(SystemUser user) {
@@ -57,15 +57,13 @@ public class SystemUserService {
     }
 
     public void deleteSystemUser(long userId) {
-        SystemUser user = systemUserRepository.findSystemUserById(userId)
-                .orElseThrow(() -> new UserValidationException(String.format(NO_USER_WITH_ID, userId)));
+        SystemUser user = findSystemUserById(userId);
         systemUserRepository.delete(user);
     }
 
     @Transactional
     public void updateSystemUser(long userId, String name, String email, String phoneNumber) {
-        SystemUser user = systemUserRepository.findSystemUserById(userId)
-                .orElseThrow(() -> new UserValidationException(String.format(NO_USER_WITH_ID, userId)));
+        SystemUser user = findSystemUserById(userId);
         if (name != null) {
             validateName(name);
             user.setName(name);
@@ -82,8 +80,7 @@ public class SystemUserService {
 
     @Transactional
     public SystemUser updateSystemUserStatus(long userId, String userStatus) {
-        SystemUser user = systemUserRepository.findSystemUserById(userId)
-                .orElseThrow(() -> new UserValidationException(String.format(NO_USER_WITH_ID, userId)));
+        SystemUser user = findSystemUserById(userId);
         validateStatus(userStatus);
         SystemUserStatus status = SystemUserStatus.valueOf(userStatus);
         user.setUserStatus(status);
@@ -91,8 +88,13 @@ public class SystemUserService {
         return user;
     }
 
+    private SystemUser findSystemUserById(long userId) {
+        return systemUserRepository.findSystemUserById(userId)
+                .orElseThrow(() -> new UserNotFoundException(String.format(NO_USER_WITH_ID, userId)));
+    }
+
     private void validateName(String name) {
-        if (name.length() == 0) {
+        if (name.length() == 0 || name.length() > 20) {
             throw new UserValidationException(NAME_IS_INVALID);
         }
     }

@@ -45,7 +45,7 @@ public class SystemUserController {
         systemUserService.updateSystemUser(userId, name, email, phoneNumber);
     }
 
-    @PutMapping(path = "status/{id}")
+    @PutMapping(path = "{id}/status")
     public SystemUser updateSystemUserStatus(@PathVariable("id") long userId, @RequestParam() String userStatus) {
         return systemUserService.updateSystemUserStatus(userId, userStatus);
     }
